@@ -33,7 +33,7 @@ impl Storage {
     fn process_command(&self, input: &str) -> Result<String, String> {
         let cmd = input.split_whitespace().next().unwrap_or("");
         let command_enum = AvailableCommand::from_str(cmd)
-            .map_err(|_| format!("Unknown command: {}", cmd))?;
+            .map_err(|_| format!("Unknown command - {}", cmd))?;
 
         let handler = match command_enum {
             AvailableCommand::SET => Self::handle_set,

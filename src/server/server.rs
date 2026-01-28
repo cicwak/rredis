@@ -19,13 +19,12 @@ impl Server{
 
         loop {
             let (socket, addr) = listener.accept().await?;
-            println!("Новое соединение: {}", addr);
 
             self.connect(socket, addr);
         }
     }
 
-    pub fn connect(&self, mut socket: TcpStream, addr: SocketAddr){
+    pub fn connect(&self, mut socket: TcpStream, _addr: SocketAddr){
         let storage = self.storage.clone();
 
         tokio::spawn(async move {
@@ -41,21 +40,14 @@ impl Server{
                     }
                 };
 
-                println!("Received {} bytes from {}", n, addr);
-                // println!("Received: {}", String::from_utf8_lossy(&buf[..n]));
                 let message = storage
                     .process_input(
                         String::from_utf8_lossy(&buf[..n]).to_string().as_str()
-                    ).unwrap_or_else(|err| {format!("Unexpected error: {err}")} );
-
-
-                // let message = match message {
-                //     Ok(res) => res,
-                //     Err(error) => format!("Unexpected error: {error}\r\n", ).as_str().parse().unwrap(),
-                // };
+                    ).unwrap_or_else(|err| {format!("Error: {err}")} );
+                
 
                 if let Err(e) = socket.write_all((message + "\r\n").to_string().as_bytes()).await {
-                    eprintln!("Ошибка при записи: {}", e);
+                    eprintln!("Error on write to socket: {}", e);
                     return;
                 }
             }
