@@ -15,7 +15,5 @@ remove_nested_parens = true
 format_code_in_doc_comments = true
 wrap_comments = true
 
-trailing_comma = "Always"
-
 reorder_impl_items = true
 reorder_modules = true
