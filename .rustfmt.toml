@@ -6,7 +6,7 @@ use_field_init_shorthand = true
 
 group_imports = "StdExternalCrate"
 
-imports_granularity="Crate"
+imports_granularity = "Crate"
 
 where_single_line = false
 
@@ -17,5 +17,5 @@ wrap_comments = true
 
 trailing_comma = "Always"
 
- reorder_impl_items = true
- reorder_modules = true
+reorder_impl_items = true
+reorder_modules = true
