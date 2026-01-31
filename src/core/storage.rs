@@ -12,18 +12,23 @@ enum AvailableCommand {
     SET,
     #[strum(serialize = "GET")]
     GET,
+    #[strum(serialize = "DEL")]
+    DEL,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Display, EnumString, IntoStaticStr)]
-enum DataType {
-    STRING = 0x00,
-    NULL = 0x01,
+#[derive(Debug, Clone, PartialEq, Display, EnumString, IntoStaticStr)]
+pub enum Data {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+    Null(Option<String>),
+    // Binary(Vec<u8>),  // Для картинок или произвольных данных
+    // List(Vec<Value>), // Можно даже делать вложенные структуры
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
-    data_type: DataType,
-    data: Vec<u8>,
+    data: Data,
     ttl: i32,
 }
 
@@ -42,8 +47,17 @@ impl Storage {
     pub fn process_input(&self, input: &str) -> Result<String, String> {
         let data = self.process_command(input);
         match data {
-            Ok(value) => Ok(String::from_utf8(value.data.to_vec()).unwrap().to_string()),
+            Ok(value) => Ok(String::from_utf8(self.data_to_vec_u8(value.data)).unwrap()),
             Err(_) => Err("Error: Unknown command".to_string()),
+        }
+    }
+
+    fn data_to_vec_u8(&self, data: Data) -> Vec<u8> {
+        match data {
+            Data::String(string) => string.into_bytes(),
+            Data::Integer(integer) => integer.to_string().into_bytes(),
+            Data::Boolean(boolean) => boolean.to_string().into_bytes(),
+            Data::Null(null) => null.unwrap_or("null".to_string()).to_string().into_bytes(),
         }
     }
 
@@ -55,10 +69,25 @@ impl Storage {
         let handler = match command_enum {
             AvailableCommand::SET => Self::handle_set,
             AvailableCommand::GET => Self::handle_get,
+            AvailableCommand::DEL => Self::handle_del,
         };
 
         handler(self, input.split_whitespace().skip(1).collect())
             .map_err(|error| format!("Error: {error:?}"))
+    }
+
+    fn handle_del(&self, args: Vec<&str>) -> Result<Value, String> {
+        self.del(args.get(0).ok_or("DEL: Key is not specified")?)
+    }
+
+    pub fn del(&self, key: &str) -> Result<Value, String> {
+        let mut map = self.data.write().expect("RwLock poisoned");
+        map.remove(key);
+
+        Ok(Value {
+            data: Data::String("Ok".to_string()),
+            ttl: -1,
+        })
     }
 
     fn handle_set(&self, args: Vec<&str>) -> Result<Value, String> {
@@ -78,15 +107,13 @@ impl Storage {
         map.insert(
             key.to_string(),
             Value {
-                data_type: DataType::STRING,
-                data: value.to_string().as_bytes().to_vec(),
+                data: Data::from_str(value).unwrap_or(Data::String("None".to_string())),
                 ttl: ttl.unwrap_or(-1),
             },
         );
 
         Ok(Value {
-            data_type: DataType::STRING,
-            data: "Ok".to_string().as_bytes().to_vec(),
+            data: Data::String("Ok".to_string()),
             ttl: ttl.unwrap_or(-1),
         })
     }
@@ -97,7 +124,6 @@ impl Storage {
 
         match value {
             Ok(value) => Ok(Value {
-                data_type: value.data_type,
                 data: value.data,
                 ttl: value.ttl,
             }),
@@ -106,11 +132,10 @@ impl Storage {
     }
 
     pub fn get(&self, key: &str) -> Result<Value, String> {
-        let map = self.data.read().unwrap();
+        let map = self.data.read().expect("RwLock poisoned");
 
         Ok(map.get(key).cloned().unwrap_or(Value {
-            data_type: DataType::NULL,
-            data: "null".as_bytes().to_vec(),
+            data: Data::Null(Option::None),
             ttl: -1,
         }))
     }
