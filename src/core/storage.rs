@@ -51,10 +51,29 @@ impl Storage {
             AvailableCommand::GET => Self::handle_get,
             AvailableCommand::DEL => Self::handle_del,
             AvailableCommand::PING => Self::hangle_ping,
+            AvailableCommand::STATS => Self::handle_stats,
         };
 
         handler(self, input.split_whitespace().skip(1).collect())
             .map_err(|error| format!("Error: {error:?}"))
+    }
+
+    fn handle_stats(&self, _: Vec<&str>) -> Result<Value, String> {
+        let map = self.data.read().expect("RwLock poisoned");
+
+        let iter_keys = map.keys();
+
+        let mut val: Vec<String> = Vec::new();
+        for key in iter_keys {
+            let ret = map.get(key).cloned().unwrap();
+
+            val.push(format!("key={},value={},ttl={}", key, ret.data, ret.ttl))
+        }
+
+        Ok(Value {
+            data: val.join("|"),
+            ttl: -1,
+        })
     }
 
     fn hangle_ping(&self, _: Vec<&str>) -> Result<Value, String> {
