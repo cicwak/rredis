@@ -10,4 +10,6 @@ pub enum AvailableCommand {
     DEL,
     #[strum(serialize = "PING")]
     PING,
+    #[strum(serialize = "STATS")]
+    STATS,
 }
