@@ -5,6 +5,13 @@ pub struct Value {
 }
 
 impl Value {
+    pub fn new(data: String, ttl: Option<i32>) -> Self {
+        Self {
+            data,
+            ttl: ttl.unwrap_or(-1),
+        }
+    }
+
     pub fn data(&self) -> &String {
         &self.data
     }

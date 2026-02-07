@@ -72,17 +72,11 @@ impl Storage {
             }
         }
 
-        Ok(Value {
-            data: val.join("|"),
-            ttl: -1,
-        })
+        Ok(Value::new("Ok".to_string(), None))
     }
 
     fn hangle_ping(&self, _: Vec<&str>) -> Result<Value, String> {
-        Ok(Value {
-            data: "PONG".to_string(),
-            ttl: -1,
-        })
+        Ok(Value::new("PONG".to_string(), None))
     }
 
     fn handle_del(&self, args: Vec<&str>) -> Result<Value, String> {
@@ -93,10 +87,7 @@ impl Storage {
         let mut map = self.data.write().expect("RwLock poisoned");
         map.remove(key);
 
-        Ok(Value {
-            data: "Ok".to_string(),
-            ttl: -1,
-        })
+        Ok(Value::new("Ok".to_string(), None))
     }
 
     fn handle_set(&self, args: Vec<&str>) -> Result<Value, String> {
@@ -119,10 +110,7 @@ impl Storage {
             },
         );
 
-        Ok(Value {
-            data: "Ok".to_string(),
-            ttl: -1,
-        })
+        Ok(Value::new("Ok".to_string(), None))
     }
 
     fn handle_get(&self, args: Vec<&str>) -> Result<Value, String> {
@@ -149,10 +137,7 @@ impl Storage {
 
         if self.time_manager.is_expire_time(value.ttl) && value.data != "(null)" {
             self.del(key)?;
-            return Ok(Value {
-                data: "(null)".to_string(),
-                ttl: -1,
-            });
+            return Ok(Value::new("(null)".to_string(), None));
         }
 
         Ok(value)
