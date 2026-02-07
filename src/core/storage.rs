@@ -4,60 +4,40 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use strum_macros::{Display, EnumString, IntoStaticStr};
-
-#[derive(Debug, Clone, Copy, PartialEq, Display, EnumString, IntoStaticStr)]
-enum AvailableCommand {
-    #[strum(serialize = "SET")]
-    SET,
-    #[strum(serialize = "GET")]
-    GET,
-    #[strum(serialize = "DEL")]
-    DEL,
-}
-
-#[derive(Debug, Clone, PartialEq, Display, EnumString, IntoStaticStr)]
-pub enum Data {
-    String(String),
-    Integer(i64),
-    Boolean(bool),
-    Null(Option<String>),
-    // Binary(Vec<u8>),  // Для картинок или произвольных данных
-    // List(Vec<Value>), // Можно даже делать вложенные структуры
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Value {
-    data: Data,
-    ttl: i32,
-}
+use crate::core::{commands::AvailableCommand, time_manager::TimeManager, value::Value};
 
 #[derive(Clone)]
 pub struct Storage {
     data: Arc<RwLock<HashMap<String, Value>>>,
+    time_manager: TimeManager,
 }
 
 impl Storage {
-    pub fn new() -> Self {
+    pub fn new(time_manager: TimeManager) -> Self {
         Self {
             data: Arc::new(RwLock::new(HashMap::new())),
+            time_manager,
         }
     }
+
+    fn data_to_vec_u8(&self, data: String) -> Vec<u8> {
+        data.into_bytes()
+    }
+
+    // fn data_to_vec_u8(&self, data: Data) -> Vec<u8> {
+    //     match data {
+    //         Data::String(string) => string.into_bytes(),
+    //         Data::Integer(integer) => integer.to_string().into_bytes(),
+    //         Data::Boolean(boolean) => boolean.to_string().into_bytes(),
+    //         Data::Null(null) =>
+    // null.unwrap_or("null".to_string()).to_string().into_bytes(),     }
+    // }
 
     pub fn process_input(&self, input: &str) -> Result<String, String> {
         let data = self.process_command(input);
         match data {
             Ok(value) => Ok(String::from_utf8(self.data_to_vec_u8(value.data)).unwrap()),
-            Err(_) => Err("Error: Unknown command".to_string()),
-        }
-    }
-
-    fn data_to_vec_u8(&self, data: Data) -> Vec<u8> {
-        match data {
-            Data::String(string) => string.into_bytes(),
-            Data::Integer(integer) => integer.to_string().into_bytes(),
-            Data::Boolean(boolean) => boolean.to_string().into_bytes(),
-            Data::Null(null) => null.unwrap_or("null".to_string()).to_string().into_bytes(),
+            Err(e) => Err(e),
         }
     }
 
@@ -85,7 +65,7 @@ impl Storage {
         map.remove(key);
 
         Ok(Value {
-            data: Data::String("Ok".to_string()),
+            data: "Ok".to_string(),
             ttl: -1,
         })
     }
@@ -94,27 +74,25 @@ impl Storage {
         let key = args.get(0).ok_or("SET: Key is not specified")?;
         let value = args.get(1).ok_or("SET: Value is not specified")?;
         let ttl = args.get(2).unwrap_or(&"-1");
+        let ttl = i32::from_str(ttl).expect("TTL is not a number");
+        let server_expire_time = self.time_manager.get_expire_time(ttl);
 
-        let set_data = self.set(key, value, i32::from_str(ttl).ok());
-        match set_data {
-            Ok(set_data) => Ok(set_data),
-            Err(error) => Err(error),
-        }
+        self.set(key, value, server_expire_time)
     }
 
-    pub fn set(&self, key: &str, value: &str, ttl: Option<i32>) -> Result<Value, String> {
+    pub fn set(&self, key: &str, value: &str, ttl: i32) -> Result<Value, String> {
         let mut map = self.data.write().expect("RwLock poisoned");
         map.insert(
             key.to_string(),
             Value {
-                data: Data::from_str(value).unwrap_or(Data::String("None".to_string())),
-                ttl: ttl.unwrap_or(-1),
+                data: value.to_string(),
+                ttl,
             },
         );
 
         Ok(Value {
-            data: Data::String("Ok".to_string()),
-            ttl: ttl.unwrap_or(-1),
+            data: "Ok".to_string(),
+            ttl: -1,
         })
     }
 
@@ -132,11 +110,22 @@ impl Storage {
     }
 
     pub fn get(&self, key: &str) -> Result<Value, String> {
-        let map = self.data.read().expect("RwLock poisoned");
+        let value = {
+            let map = self.data.read().expect("RwLock poisoned");
+            map.get(key).cloned().unwrap_or(Value {
+                data: "(null)".to_string(),
+                ttl: -1,
+            })
+        };
 
-        Ok(map.get(key).cloned().unwrap_or(Value {
-            data: Data::Null(Option::None),
-            ttl: -1,
-        }))
+        if self.time_manager.is_expire_time(value.ttl) && value.data != "(null)" {
+            self.del(key)?;
+            return Ok(Value {
+                data: "(null)".to_string(),
+                ttl: -1,
+            });
+        }
+
+        Ok(value)
     }
 }
