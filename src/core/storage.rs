@@ -61,13 +61,15 @@ impl Storage {
     fn handle_stats(&self, _: Vec<&str>) -> Result<Value, String> {
         let map = self.data.read().expect("RwLock poisoned");
 
-        let iter_keys = map.keys();
-
-        let mut val: Vec<String> = Vec::new();
-        for key in iter_keys {
-            let ret = map.get(key).cloned().unwrap();
-
-            val.push(format!("key={},value={},ttl={}", key, ret.data, ret.ttl))
+        let mut val: Vec<String> = Vec::with_capacity(map.len());
+        for (key, ret) in map.iter() {
+            if let Some(ret) = map.get(key) {
+                // Skip expired entries so STATS reflects only visible (non-expired) keys.
+                if self.time_manager.is_expire_time(ret.ttl) {
+                    continue;
+                }
+                val.push(format!("key={},value={},ttl={}", key, ret.data, ret.ttl));
+            }
         }
 
         Ok(Value {
