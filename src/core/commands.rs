@@ -8,4 +8,6 @@ pub enum AvailableCommand {
     SET,
     #[strum(serialize = "DEL")]
     DEL,
+    #[strum(serialize = "PING")]
+    PING,
 }

@@ -50,10 +50,18 @@ impl Storage {
             AvailableCommand::SET => Self::handle_set,
             AvailableCommand::GET => Self::handle_get,
             AvailableCommand::DEL => Self::handle_del,
+            AvailableCommand::PING => Self::hangle_ping,
         };
 
         handler(self, input.split_whitespace().skip(1).collect())
             .map_err(|error| format!("Error: {error:?}"))
+    }
+
+    fn hangle_ping(&self, _: Vec<&str>) -> Result<Value, String> {
+        Ok(Value {
+            data: "PONG".to_string(),
+            ttl: -1,
+        })
     }
 
     fn handle_del(&self, args: Vec<&str>) -> Result<Value, String> {
